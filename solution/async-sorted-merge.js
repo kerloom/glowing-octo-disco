@@ -5,16 +5,25 @@ const MinHeap = require("../lib/min-heap");
 module.exports = (logSources, printer) => {
   return new Promise(async (resolve, reject) => {
     try {
+      /* For the async solution, I tried speeding up with batches, but if we are memory bound, it does not help much.
+      If for example, we have 100 sources and a batch of 10, then we would need 1000 entries in memory to process the next 10 logs,
+      and on each iteration we are adding 1000 entries.
+      */
       const heap = new MinHeap();
 
-      await Promise.all(
-        logSources.map(async (source, index) => {
-          const entry = await source.popAsync();
-          if (entry) {
-            heap.insert({ sourceIndex: index, entry });
-          }
-        })
-      );
+      const promises = logSources.map(async (source, index) => {
+        return source
+          .popAsync()
+          .then((entry) => ({ sourceIndex: index, entry }));
+      });
+
+      const results = await Promise.all(promises);
+
+      results.forEach(({ sourceIndex, entry }) => {
+        if (entry) {
+          heap.insert({ sourceIndex, entry });
+        }
+      });
 
       // Process and print log entries in chronological order
       while (heap.size() > 0) {
